@@ -1,0 +1,240 @@
+---
+title: "令牌验证"
+source: "https://fastmcp.wiki/zh/servers/auth/token-verification"
+version: "latest"
+---
+
+# 令牌验证
+
+> 原始文档来源：https://fastmcp.wiki/zh/servers/auth/token-verification
+
+---
+
+理解令牌验证
+令牌验证模型
+令牌安全考虑
+TokenVerifier 类
+JWT 令牌验证
+JWKS 端点集成
+对称密钥验证（HMAC）
+静态公钥验证
+不透明令牌验证
+理解不透明令牌
+令牌内省协议
+开发和测试
+静态令牌验证
+测试令牌生成
+环境配置
+身份认证
+令牌验证
+
+通过验证外部系统颁发的承载令牌来保护您的服务器。
+
+版本
+2.11.0
+新增
+令牌验证使您的 FastMCP 服务器能够验证外部系统颁发的承载令牌，而无需参与用户身份验证流程。您的服务器作为纯资源服务器，专注于令牌验证和授权决策，同时将身份管理委托给基础设施中的其他系统。
+令牌验证在某种程度上在正式的 MCP 身份验证流程之外运行，该流程期望 OAuth 风格的发现。它最适合内部系统、微服务架构，或者当您完全控制令牌生成和分发时使用。
+
+理解令牌验证
+令牌验证解决了身份验证责任分布在多个系统中的场景。您的 MCP 服务器接收包含身份和授权信息的结构化令牌，验证其真实性，并根据其内容做出访问控制决策。
+这种模式在微服务架构中自然出现，其中中央身份验证服务颁发令牌，多个下游服务独立验证这些令牌。当将 MCP 服务器集成到已有基于令牌的身份验证机制的现有系统中时，它也工作得很好。
+
+令牌验证模型
+令牌验证将您的 MCP 服务器视为 OAuth 术语中的资源服务器。关键见解是令牌验证和令牌颁发是分离的关注点，可以由不同的系统处理。
+令牌颁发：另一个系统（API 网关、身份验证服务或身份提供商）处理用户身份验证并创建包含身份和权限信息的签名令牌。
+令牌验证：您的 MCP 服务器接收这些令牌，使用加密签名验证其真实性，并从其声明中提取授权信息。
+访问控制：基于令牌内容，您的服务器确定客户端可以访问哪些资源、工具和提示。
+这种分离允许您的 MCP 服务器专注于其核心功能，同时利用现有的身份验证基础设施。令牌作为便携式身份证明，随每个请求一起传输。
+
+令牌安全考虑
+基于令牌的身份验证依赖于加密签名来确保令牌完整性。您的 MCP 服务器使用与令牌创建所用私钥对应的公钥验证令牌。这种非对称方法意味着您的服务器永远不需要访问签名密钥。
+令牌验证必须解决几个安全要求：签名验证确保令牌未被篡改，过期检查防止使用过期令牌，受众验证确保为您的服务器设计的令牌不被其他系统接受。
+在 MCP 环境中的挑战是客户端需要在发出请求之前获得有效令牌，但 MCP 协议不提供令牌端点的内置发现机制。客户端必须通过单独的渠道或先前的配置获得令牌。
+
+TokenVerifier 类
+FastMCP 提供 TokenVerifier 类来处理令牌验证复杂性，同时对令牌来源和验证策略保持灵活性。
+TokenVerifier 专注于令牌验证，不提供 OAuth 发现元数据。这使其成为内部系统的理想选择，在这些系统中客户端已经知道如何获得令牌，或者用于信任已知颁发者令牌的微服务。
+该类验证令牌签名，检查过期时间戳，并从令牌声明中提取授权信息。它支持各种令牌格式和验证策略，同时为授权决策保持一致的接口。
+您可以子类化 TokenVerifier 来为专门的令牌格式或验证要求实现自定义验证逻辑。基类处理常见模式，同时允许扩展独特用例。
+
+JWT 令牌验证
+JSON Web 令牌（JWT）代表现代应用程序最常见的令牌格式。FastMCP 的 JWTVerifier 使用行业标准加密技术和声明验证来验证 JWT。
+
+JWKS 端点集成
+JWKS 端点集成为生产系统提供了最灵活的方法。验证器自动从 JSON Web Key Set 端点获取公钥，启用自动密钥轮换而无需服务器配置更改。
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+
+# 针对您的身份提供商配置 JWT 验证
+verifier = JWTVerifier(
+    jwks_uri="https://auth.yourcompany.com/.well-known/jwks.json",
+    issuer="https://auth.yourcompany.com",
+    audience="mcp-production-api"
+)
+
+mcp = FastMCP(name="Protected API", auth=verifier)
+
+此配置创建一个验证由 auth.yourcompany.com 颁发的 JWT 的服务器。验证器定期从 JWKS 端点获取公钥，并使用这些密钥验证传入令牌。只有具有正确颁发者和受众声明的令牌才会被接受。
+issuer 参数确保令牌来自您受信任的身份验证系统，而 audience 验证防止为其他服务设计的令牌被您的 MCP 服务器接受。
+
+对称密钥验证（HMAC）
+对称密钥验证使用共享密钥进行签名和验证，使其成为内部微服务和可信环境的理想选择，在这些环境中相同的密钥可以安全地分发给令牌颁发者和验证者。
+这种方法通常用于微服务架构中服务共享密钥，或者当您的身份验证服务和 MCP 服务器都由同一组织管理时。当共享密钥得到适当管理时，HMAC 算法（HS256、HS384、HS512）提供强大的安全性。
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+
+# 使用共享密钥进行对称密钥验证
+verifier = JWTVerifier(
+    public_key="your-shared-secret-key-minimum-32-chars",  # 尽管名称如此，但这接受对称密钥
+    issuer="internal-auth-service",
+    audience="mcp-internal-api",
+    algorithm="HS256"  # 或 HS384、HS512 以获得更强安全性
+)
+
+mcp = FastMCP(name="Internal API", auth=verifier)
+
+验证器将使用指定的 HMAC 算法验证使用相同密钥签名的令牌。这种方法为内部系统提供了几个优势：
+简单性：无需密钥对管理或证书分发
+性能：HMAC 操作通常比 RSA 快
+兼容性：与现有微服务身份验证模式配合良好
+为了向后兼容，参数命名为 public_key，但当使用 HMAC 算法（HS256/384/512）时，它接受对称密钥字符串。
+对称密钥的安全考虑：
+使用强随机生成的密钥（建议最少 32 个字符）
+永远不要在日志、错误消息或版本控制中暴露密钥
+实施安全的密钥分发和轮换机制
+对于面向外部的 API，考虑使用非对称密钥（RSA/ECDSA）
+
+静态公钥验证
+静态公钥验证在您有固定的 RSA 或 ECDSA 签名密钥且不需要自动密钥轮换时有效。这种方法主要用于开发环境或没有 JWKS 端点可用时的受控部署。
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+
+# 使用静态公钥进行令牌验证
+public_key_pem = """-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
+-----END PUBLIC KEY-----"""
+
+verifier = JWTVerifier(
+    public_key=public_key_pem,
+    issuer="https://auth.yourcompany.com",
+    audience="mcp-production-api"
+)
+
+mcp = FastMCP(name="Protected API", auth=verifier)
+
+此配置使用特定的 RSA 或 ECDSA 公钥验证令牌。密钥必须与令牌颁发者使用的私钥相对应。虽然不如 JWKS 端点灵活，但这种方法在开发环境中或使用固定密钥测试时可能很有用。
+
+不透明令牌验证
+许多授权服务器颁发不透明令牌而不是自包含的 JWT。不透明令牌是随机字符串，本身不携带任何信息 - 授权服务器维护其状态，验证需要查询服务器。FastMCP 通过 OAuth 2.0 令牌内省（RFC 7662）支持不透明令牌验证。
+
+理解不透明令牌
+不透明令牌在验证模型上与 JWT 根本不同。JWT 携带可以本地验证的签名声明，而不透明令牌需要向颁发授权服务器进行网络调用以进行验证。授权服务器维护令牌状态，可以立即撤销令牌，为敏感操作提供更强的安全保证。
+这种方法以性能（每次验证的网络延迟）换取安全性和灵活性。授权服务器可以立即撤销不透明令牌，实施复杂的授权逻辑，并维护令牌使用的详细审计日志。许多企业 OAuth 提供商默认使用不透明令牌以获得这些安全优势。
+
+令牌内省协议
+RFC 7662 标准化了资源服务器如何验证不透明令牌。该协议定义了一个内省端点，资源服务器使用客户端凭据进行身份验证，并接收令牌元数据，包括活动状态、作用域、过期时间和主体身份。
+FastMCP 通过 IntrospectionTokenVerifier 类实现此协议，根据规范处理身份验证、请求格式化和响应解析。
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.introspection import IntrospectionTokenVerifier
+
+# 使用您的 OAuth 提供商配置内省
+verifier = IntrospectionTokenVerifier(
+    introspection_url="https://auth.yourcompany.com/oauth/introspect",
+    client_id="mcp-resource-server",
+    client_secret="your-client-secret",
+    required_scopes=["api:read", "api:write"]
+)
+
+mcp = FastMCP(name="Protected API", auth=verifier)
+
+验证器使用 HTTP Basic Auth 与您的客户端凭据向内省端点进行身份验证。当带有承载令牌的请求到达时，FastMCP 查询内省端点以确定令牌是否活动并具有足够的作用域。
+
+开发和测试
+开发环境通常需要更简单的令牌管理，而无需完整 JWT 基础设施的复杂性。FastMCP 专门为这些场景提供了工具。
+
+静态令牌验证
+静态令牌验证通过接受具有相关声明的预定义令牌来支持快速开发。这种方法消除了开发和测试期间对令牌生成基础设施的需求。
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
+
+# 定义开发令牌及其相关声明
+verifier = StaticTokenVerifier(
+    tokens={
+        "dev-alice-token": {
+            "client_id": "alice@company.com",
+            "scopes": ["read:data", "write:data", "admin:users"]
+        },
+        "dev-guest-token": {
+            "client_id": "guest-user",
+            "scopes": ["read:data"]
+        }
+    },
+    required_scopes=["read:data"]
+)
+
+mcp = FastMCP(name="Development Server", auth=verifier)
+
+客户端现在可以使用 Authorization: Bearer dev-alice-token 标头进行身份验证。服务器将识别令牌并加载相关声明以进行授权决策。这种方法支持无需外部依赖的即时开发。
+静态令牌验证将令牌存储为纯文本，绝不应在生产环境中使用。它专为开发和测试场景设计。
+
+测试令牌生成
+当您需要测试 JWT 验证而无需设置完整的身份基础设施时，测试令牌生成很有帮助。FastMCP 包含用于生成测试密钥对和签名令牌的工具。
+from fastmcp.server.auth.providers.jwt import JWTVerifier, RSAKeyPair
+
+# 生成用于测试的密钥对
+key_pair = RSAKeyPair.generate()
+
+# 使用公钥配置您的服务器
+verifier = JWTVerifier(
+    public_key=key_pair.public_key,
+    issuer="https://test.yourcompany.com",
+    audience="test-mcp-server"
+)
+
+# 使用私钥生成测试令牌
+test_token = key_pair.create_token(
+    subject="test-user-123",
+    issuer="https://test.yourcompany.com",
+    audience="test-mcp-server",
+    scopes=["read", "write", "admin"]
+)
+
+print(f"Test token: {test_token}")
+
+这种模式支持 JWT 验证逻辑的全面测试，而无需依赖外部令牌颁发者。生成的令牌在加密上是有效的，并将通过所有标准 JWT 验证检查。
+
+环境配置
+版本
+2.12.1
+新增
+FastMCP 支持编程式和基于环境的令牌验证配置，支持跨不同环境的灵活部署。
+基于环境的配置将身份验证设置与应用程序代码分离，遵循十二因素应用原则并简化部署管道。
+# 启用 JWT 验证
+export FASTMCP_SERVER_AUTH=fastmcp.server.auth.providers.jwt.JWTVerifier
+
+# 对于使用 JWKS 端点的非对称验证：
+export FASTMCP_SERVER_AUTH_JWT_JWKS_URI="https://auth.company.com/.well-known/jwks.json"
+export FASTMCP_SERVER_AUTH_JWT_ISSUER="https://auth.company.com"
+export FASTMCP_SERVER_AUTH_JWT_AUDIENCE="mcp-production-api"
+export FASTMCP_SERVER_AUTH_JWT_REQUIRED_SCOPES="read:data,write:data"
+
+# 或者对于对称密钥验证（HMAC）：
+export FASTMCP_SERVER_AUTH_JWT_PUBLIC_KEY="your-shared-secret-key-minimum-32-chars"
+export FASTMCP_SERVER_AUTH_JWT_ALGORITHM="HS256"  # 或 HS384、HS512
+export FASTMCP_SERVER_AUTH_JWT_ISSUER="internal-auth-service"
+export FASTMCP_SERVER_AUTH_JWT_AUDIENCE="mcp-internal-api"
+
+配置这些环境变量后，您的 FastMCP 服务器自动启用 JWT 验证：
+from fastmcp import FastMCP
+
+# 身份验证从环境自动配置
+mcp = FastMCP(name="Production API")
+
+这种方法使同一代码库可以在开发、测试和生产环境中运行，具有不同的身份验证要求。开发可能使用静态令牌，而生产使用 JWT 验证，所有这些都通过环境配置控制。
+身份验证
+
+远程 OAuth
+
+x
+

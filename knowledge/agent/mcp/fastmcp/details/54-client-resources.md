@@ -1,0 +1,104 @@
+---
+title: "读取资源"
+source: "https://fastmcp.wiki/zh/clients/resources"
+version: "latest"
+---
+
+# 读取资源
+
+> 原始文档来源：https://fastmcp.wiki/zh/clients/resources
+
+---
+
+读取资源
+内容类型
+多服务端客户端
+版本选择
+原始协议访问
+操作
+读取资源
+
+访问来自 MCP 服务端的静态和模板化数据源。
+
+版本
+2.0.0
+新增
+当你需要读取服务端暴露的资源数据时，请使用此功能，例如配置文件、生成内容或外部数据源。
+资源是 MCP 服务端暴露的数据源。它们可以是内容固定的静态文件，也可以是根据 URI 参数生成内容的动态模板。
+
+读取资源
+使用资源 URI 读取资源：
+async with client:
+    content = await client.read_resource("file:///path/to/README.md")
+    # content -> list[TextResourceContents | BlobResourceContents]
+
+    # 访问文本内容
+    if hasattr(content[0], 'text'):
+        print(content[0].text)
+
+    # 访问二进制内容
+    if hasattr(content[0], 'blob'):
+        print(f"Binary data: {len(content[0].blob)} bytes")
+
+资源模板会根据 URI 参数生成内容。模板会定义类似 weather://{{city}}/current 的模式，你在读取时填入参数：
+async with client:
+    # 从资源模板读取
+    weather_content = await client.read_resource("weather://london/current")
+    print(weather_content[0].text)
+
+内容类型
+资源会根据其暴露内容返回不同内容类型。
+文本资源包括配置文件、JSON 数据和其他人类可读内容：
+async with client:
+    content = await client.read_resource("resource://config/settings.json")
+
+    for item in content:
+        if hasattr(item, 'text'):
+            print(f"Text content: {item.text}")
+            print(f"MIME type: {item.mimeType}")
+
+二进制资源包括图片、PDF 和其他非文本数据：
+async with client:
+    content = await client.read_resource("resource://images/logo.png")
+
+    for item in content:
+        if hasattr(item, 'blob'):
+            print(f"Binary content: {len(item.blob)} bytes")
+            print(f"MIME type: {item.mimeType}")
+
+            # 保存到文件
+            with open("downloaded_logo.png", "wb") as f:
+                f.write(item.blob)
+
+多服务端客户端
+使用多服务端客户端时，资源 URI 会以服务端名称作为前缀：
+async with client:  # Multi-server client
+    weather_icons = await client.read_resource("weather://weather/icons/sunny")
+    templates = await client.read_resource("resource://assistant/templates/list")
+
+版本选择
+版本
+3.0.0
+新增
+当服务端暴露同一资源的多个版本时，可以请求特定版本：
+async with client:
+    # 读取最高版本（默认）
+    content = await client.read_resource("data://config")
+
+    # 读取特定版本
+    content_v1 = await client.read_resource("data://config", version="1.0")
+
+如何发现可用版本，请参见元数据。
+
+原始协议访问
+如需完全控制，请使用 read_resource_mcp()，它会返回完整的 MCP 协议对象：
+async with client:
+    result = await client.read_resource_mcp("resource://example")
+    # result -> mcp.types.ReadResourceResult
+
+调用工具
+
+获取提示词
+
+x
+

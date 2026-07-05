@@ -1,0 +1,234 @@
+---
+title: "客户端传输"
+source: "https://fastmcp.wiki/zh/clients/transports"
+version: "latest"
+---
+
+# 客户端传输
+
+> 原始文档来源：https://fastmcp.wiki/zh/clients/transports
+
+---
+
+STDIO 传输
+环境变量
+会话持久化
+HTTP 传输
+SSL 验证
+SSE 传输
+内存内传输
+多服务端配置
+工具转换
+客户端
+客户端传输
+
+配置客户端如何连接 MCP 服务端并与其通信。
+
+版本
+2.0.0
+新增
+传输负责处理客户端与 MCP 服务端之间的底层连接。虽然客户端可以根据你传入的内容自动选择传输，但显式实例化传输能让你完全控制配置。
+
+STDIO 传输
+STDIO 传输通过子进程管道与 MCP 服务端通信。使用 STDIO 时，客户端会启动并管理服务端进程，控制其生命周期和环境。
+默认情况下，STDIO 服务端运行在隔离环境中。它们不会继承 shell 的环境变量。你必须显式传入服务端需要的任何配置。
+from fastmcp import Client
+from fastmcp.client.transports import StdioTransport
+
+transport = StdioTransport(
+    command="python",
+    args=["my_server.py", "--verbose"],
+    env={"API_KEY": "secret", "LOG_LEVEL": "DEBUG"},
+    cwd="/path/to/server"
+)
+client = Client(transport)
+
+为方便起见，客户端可以从文件路径推断 STDIO 传输，但这会限制配置选项：
+from fastmcp import Client
+
+client = Client("my_server.py")  # 受限 - 无配置选项
+
+环境变量
+由于 STDIO 服务端不会继承你的环境，因此需要策略来传递配置。
+选择性转发 只传递服务端需要的变量：
+import os
+from fastmcp.client.transports import StdioTransport
+
+required_vars = ["API_KEY", "DATABASE_URL", "REDIS_HOST"]
+env = {var: os.environ[var] for var in required_vars if var in os.environ}
+
+transport = StdioTransport(command="python", args=["server.py"], env=env)
+client = Client(transport)
+
+从 .env 文件加载 可以让配置与代码分离：
+from dotenv import dotenv_values
+from fastmcp.client.transports import StdioTransport
+
+env = dotenv_values(".env")
+transport = StdioTransport(command="python", args=["server.py"], env=env)
+client = Client(transport)
+
+会话持久化
+STDIO 传输默认会在多个客户端上下文之间保持会话（keep_alive=True）。这会为多个连接复用同一个子进程，从而提升性能。
+from fastmcp.client.transports import StdioTransport
+
+transport = StdioTransport(command="python", args=["server.py"])
+client = Client(transport)
+
+async def efficient_multiple_operations():
+    async with client:
+        await client.ping()
+
+    async with client:  # 复用同一个子进程
+        await client.call_tool("process_data", {"file": "data.csv"})
+
+若要在连接之间完全隔离，请禁用会话持久化：
+transport = StdioTransport(command="python", args=["server.py"], keep_alive=False)
+
+HTTP 传输
+版本
+2.3.0
+新增
+HTTP 传输连接以 Web 服务形式运行的 MCP 服务端。这是生产部署推荐使用的传输。
+from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport
+
+transport = StreamableHttpTransport(
+    url="https://api.example.com/mcp",
+    headers={
+        "Authorization": "Bearer your-token-here",
+        "X-Custom-Header": "value"
+    }
+)
+client = Client(transport)
+
+FastMCP 还提供认证辅助类：
+from fastmcp import Client
+from fastmcp.client.auth import BearerAuth
+
+client = Client(
+    "https://api.example.com/mcp",
+    auth=BearerAuth("your-token-here")
+)
+
+SSL 验证
+默认情况下，HTTPS 连接会验证服务端的 SSL 证书。你可以使用 verify 参数自定义此行为，它接受与 httpx 相同的值：
+from fastmcp import Client
+
+# 禁用 SSL 验证（例如开发环境中的自签名证书）
+client = Client("https://dev-server.internal/mcp", verify=False)
+
+# 使用自定义 CA bundle
+client = Client("https://corp-server.internal/mcp", verify="/path/to/ca-bundle.pem")
+
+# 使用自定义 SSL context 以获得完全控制
+import ssl
+ctx = ssl.create_default_context()
+ctx.load_verify_locations("/path/to/internal-ca.pem")
+client = Client("https://corp-server.internal/mcp", verify=ctx)
+
+StreamableHttpTransport 和 SSETransport 上也可以直接使用 verify 参数：
+from fastmcp.client.transports import StreamableHttpTransport
+
+transport = StreamableHttpTransport(
+    url="https://dev-server.internal/mcp",
+    verify=False,
+)
+client = Client(transport)
+
+SSE 传输
+Server-Sent Events 传输为了向后兼容而保留。除非有特定基础设施要求，新部署请使用 Streamable HTTP。
+from fastmcp.client.transports import SSETransport
+
+transport = SSETransport(
+    url="https://api.example.com/sse",
+    headers={"Authorization": "Bearer token"}
+)
+client = Client(transport)
+
+内存内传输
+内存内传输会在同一 Python 进程中直接连接 FastMCP 服务端实例。这消除了子进程管理和网络开销，非常适合测试。
+from fastmcp import FastMCP, Client
+import os
+
+mcp = FastMCP("TestServer")
+
+@mcp.tool
+def greet(name: str) -> str:
+    prefix = os.environ.get("GREETING_PREFIX", "Hello")
+    return f"{prefix}, {name}!"
+
+client = Client(mcp)
+
+async with client:
+    result = await client.call_tool("greet", {"name": "World"})
+
+与 STDIO 传输不同，内存内服务端与你的客户端代码共享同一内存空间和环境变量。
+
+多服务端配置
+版本
+2.4.0
+新增
+连接到配置字典中定义的多个服务端：
+from fastmcp import Client
+
+config = {
+    "mcpServers": {
+        "weather": {
+            "url": "https://weather.example.com/mcp",
+            "transport": "http"
+        },
+        "assistant": {
+            "command": "python",
+            "args": ["./assistant.py"],
+            "env": {"LOG_LEVEL": "INFO"}
+        }
+    }
+}
+
+client = Client(config)
+
+async with client:
+    # 工具按服务端命名空间隔离
+    weather = await client.call_tool("weather_get_forecast", {"city": "NYC"})
+    answer = await client.call_tool("assistant_ask", {"question": "What?"})
+
+工具转换
+FastMCP 支持在配置中进行工具转换。你可以修改来自某个服务端的工具名称、描述、标签和参数。
+config = {
+    "mcpServers": {
+        "weather": {
+            "url": "https://weather.example.com/mcp",
+            "transport": "http",
+            "tools": {
+                "weather_get_forecast": {
+                    "name": "miami_weather",
+                    "description": "Get the weather for Miami",
+                    "arguments": {
+                        "city": {
+                            "default": "Miami",
+                            "hide": True,
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+若要按标签筛选工具，请在服务端级别使用 include_tags 或 exclude_tags：
+config = {
+    "mcpServers": {
+        "weather": {
+            "url": "https://weather.example.com/mcp",
+            "include_tags": ["forecast"]  # 仅包含具有此标签的工具
+        }
+    }
+}
+
+仅客户端包
+
+fastmcp-remote
+
+x
+

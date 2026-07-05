@@ -1,0 +1,156 @@
+---
+title: "通知"
+source: "https://fastmcp.wiki/zh/clients/notifications"
+version: "latest"
+---
+
+# 通知
+
+> 原始文档来源：https://fastmcp.wiki/zh/clients/notifications
+
+---
+
+处理通知
+MessageHandler 类
+处理器模板
+列表变更通知
+服务端请求
+操作
+通知
+
+处理服务端发送的列表变更和其他事件通知。
+
+版本
+2.9.1
+新增
+当你需要响应服务端变更，例如工具列表更新或资源修改时，请使用此功能。
+MCP 服务端可以发送通知，告知客户端状态变更。消息处理器提供了处理这些通知的统一方式。
+
+处理通知
+最简单的方法是编写一个接收所有消息的函数，并筛选你关心的通知：
+from fastmcp import Client
+
+async def message_handler(message):
+    """处理来自服务端的 MCP 通知。"""
+    if hasattr(message, 'root'):
+        method = message.root.method
+
+        if method == "notifications/tools/list_changed":
+            print("工具已变更 - 刷新工具缓存")
+        elif method == "notifications/resources/list_changed":
+            print("资源已变更")
+        elif method == "notifications/prompts/list_changed":
+            print("提示词已变更")
+
+client = Client(
+    "my_mcp_server.py",
+    message_handler=message_handler,
+)
+
+MessageHandler 类
+若要进行细粒度定位，可以继承 MessageHandler 并使用特定 hook：
+from fastmcp import Client
+from fastmcp.client.messages import MessageHandler
+import mcp.types
+
+class MyMessageHandler(MessageHandler):
+    async def on_tool_list_changed(
+        self, notification: mcp.types.ToolListChangedNotification
+    ) -> None:
+        """处理工具列表变更。"""
+        print("工具列表已变更 - 刷新可用工具")
+
+    async def on_resource_list_changed(
+        self, notification: mcp.types.ResourceListChangedNotification
+    ) -> None:
+        """处理资源列表变更。"""
+        print("资源列表已变更")
+
+    async def on_prompt_list_changed(
+        self, notification: mcp.types.PromptListChangedNotification
+    ) -> None:
+        """处理提示词列表变更。"""
+        print("提示词列表已变更")
+
+client = Client(
+    "my_mcp_server.py",
+    message_handler=MyMessageHandler(),
+)
+
+处理器模板
+from fastmcp.client.messages import MessageHandler
+import mcp.types
+
+class MyMessageHandler(MessageHandler):
+    async def on_message(self, message) -> None:
+        """针对所有消息调用（请求和通知）。"""
+        pass
+
+    async def on_notification(
+        self, notification: mcp.types.ServerNotification
+    ) -> None:
+        """针对通知调用（发送后即忘）。"""
+        pass
+
+    async def on_tool_list_changed(
+        self, notification: mcp.types.ToolListChangedNotification
+    ) -> None:
+        """当服务端工具列表变更时调用。"""
+        pass
+
+    async def on_resource_list_changed(
+        self, notification: mcp.types.ResourceListChangedNotification
+    ) -> None:
+        """当服务端资源列表变更时调用。"""
+        pass
+
+    async def on_prompt_list_changed(
+        self, notification: mcp.types.PromptListChangedNotification
+    ) -> None:
+        """当服务端提示词列表变更时调用。"""
+        pass
+
+    async def on_progress(
+        self, notification: mcp.types.ProgressNotification
+    ) -> None:
+        """针对长时间运行操作中的进度更新调用。"""
+        pass
+
+    async def on_logging_message(
+        self, notification: mcp.types.LoggingMessageNotification
+    ) -> None:
+        """针对来自服务端的日志消息调用。"""
+        pass
+
+列表变更通知
+下面是维护工具缓存，并在工具变更时刷新的实际示例：
+from fastmcp import Client
+from fastmcp.client.messages import MessageHandler
+import mcp.types
+
+class ToolCacheHandler(MessageHandler):
+    def __init__(self):
+        self.cached_tools = []
+
+    async def on_tool_list_changed(
+        self, notification: mcp.types.ToolListChangedNotification
+    ) -> None:
+        """工具变更时清空工具缓存。"""
+        print("工具已变更 - 清空缓存")
+        self.cached_tools = []  # 下次访问时强制刷新
+
+client = Client("server.py", message_handler=ToolCacheHandler())
+
+服务端请求
+虽然消息处理器会接收服务端发起的请求，但在大多数交互式场景中，你应使用专用回调参数：
+采样请求：使用 sampling_handler
+用户征询请求：使用 elicitation_handler
+进度更新：使用 progress_handler
+日志消息：使用 log_handler
+消息处理器主要用于监控和处理通知，而不是响应请求。
+客户端根目录
+
+OAuth 认证
+
+x
+

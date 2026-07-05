@@ -1,0 +1,185 @@
+---
+title: "OAuth 认证"
+source: "https://fastmcp.wiki/zh/clients/auth/oauth"
+version: "latest"
+---
+
+# OAuth 认证
+
+> 原始文档来源：https://fastmcp.wiki/zh/clients/auth/oauth
+
+---
+
+客户端用法
+默认配置
+OAuth 辅助类
+OAuth Parameters
+OAuth 流程
+令牌存储
+CIMD 认证
+预注册客户端
+身份认证
+OAuth 认证
+
+通过 OAuth 2.1 认证你的 FastMCP 客户端。
+
+版本
+2.6.0
+新增
+OAuth 认证只适用于基于 HTTP 的传输，并且需要用户通过 Web 浏览器交互。
+当 FastMCP 客户端需要访问受 OAuth 2.1 保护的 MCP 服务端，并且该过程需要用户交互（例如登录并同意授权）时，应使用授权码流程。FastMCP 提供 fastmcp.client.auth.OAuth 辅助类来简化整个过程。
+这种流程常见于面向用户的应用，此时应用会代表用户执行操作。
+
+客户端用法
+
+默认配置
+使用 OAuth 最简单的方式，是将字符串 "oauth" 传给 Client 或传输实例的 auth 参数。FastMCP 会自动使用默认设置为客户端配置 OAuth：
+from fastmcp import Client
+
+# 使用默认 OAuth 设置
+async with Client("https://your-server.fastmcp.app/mcp", auth="oauth") as client:
+    await client.ping()
+
+OAuth 辅助类
+如需完整配置 OAuth 流程，可以使用 OAuth 辅助类，并将其传给 Client 或传输实例的 auth 参数。OAuth 会处理带 PKCE (Proof Key for Code Exchange) 的 OAuth 2.1 授权码授权中的复杂细节以增强安全性，并实现完整的 httpx.Auth 接口。
+from fastmcp import Client
+from fastmcp.client.auth import OAuth
+
+oauth = OAuth(scopes=["user"])
+
+async with Client("https://your-server.fastmcp.app/mcp", auth=oauth) as client:
+    await client.ping()
+
+通过 Client(auth=...) 使用 OAuth 时不需要传入 mcp_url，传输会自动提供服务端 URL。
+
+OAuth Parameters
+scopes (str | list[str]，可选)：要请求的 OAuth scope。可以是空格分隔的字符串或字符串列表
+client_name (str，可选)：用于动态注册的客户端名称。默认为 "FastMCP Client"
+client_id (str，可选)：预注册的 OAuth 客户端 ID。提供后会完全跳过 Dynamic Client Registration。参见预注册客户端
+client_secret (str，可选)：预注册客户端的 OAuth client secret。可选，依赖 PKCE 的公开客户端可以省略
+client_metadata_url (str，可选)：基于 URL 的客户端身份 (CIMD)。详见 CIMD 认证
+token_storage (AsyncKeyValue，可选)：用于持久化 OAuth token 的存储后端。默认使用内存存储（重启后令牌丢失）。加密存储选项见令牌存储
+additional_client_metadata (dict[str, Any]，可选)：用于客户端注册的额外元数据
+callback_port (int，可选)：OAuth 回调服务端使用的固定端口。未指定时使用随机可用端口
+httpx_client_factory (McpHttpClientFactory，可选)：创建 httpx 客户端的工厂
+
+OAuth 流程
+当你使用配置为 OAuth 的 FastMCP Client 时，会触发 OAuth 流程。
+1
+
+令牌检查
+
+客户端首先检查配置的 token_storage 后端中是否已有目标服务端的有效令牌。如果找到，就用它来认证客户端。
+2
+
+OAuth 服务端发现
+
+如果没有有效令牌，客户端会基于 mcp_url 使用 well-known URI（例如 /.well-known/oauth-authorization-server）尝试发现 OAuth 服务端端点。
+3
+
+客户端注册
+
+如果提供了 client_id，客户端会直接使用这些预注册凭据并完全跳过此步骤。否则，如果配置了 client_metadata_url 且服务端支持 CIMD，客户端会使用其元数据 URL 作为身份。作为回退，如果服务端支持，客户端会执行 Dynamic Client Registration (RFC 7591)。
+4
+
+本地回调服务端
+
+在一个可用端口（或通过 callback_port 指定的端口）上启动临时本地 HTTP 服务端。该服务端地址（例如 http://127.0.0.1:<port>/callback）会作为 OAuth 流程的 redirect_uri。
+5
+
+浏览器交互
+
+系统会自动打开用户的默认 Web 浏览器，并跳转到 OAuth 服务端的授权端点。用户登录并同意（或拒绝）请求的 scopes。
+6
+
+授权码与令牌交换
+
+用户同意后，OAuth 服务端会携带 authorization_code 将用户浏览器重定向到本地回调服务端。客户端捕获该代码，并使用 PKCE 与 OAuth 服务端的令牌端点交换 access_token（通常还包括 refresh_token）以保证安全。
+7
+
+令牌缓存
+
+获取到的令牌会保存到配置的 token_storage 后端，供后续使用，从而避免重复的浏览器交互。
+8
+
+已认证请求
+
+访问 MCP 服务端的请求会自动在 Authorization 头中包含访问令牌。
+9
+
+刷新令牌
+
+如果访问令牌过期，客户端会自动使用刷新令牌获取新的访问令牌。
+
+令牌存储
+版本
+2.13.0
+新增
+默认情况下，令牌存储在内存中，并会在应用重启时丢失。如需持久化存储，请向 token_storage 参数传入兼容 AsyncKeyValue 的存储后端。
+安全注意事项：生产环境请使用加密存储。MCP 客户端可能会随着时间积累许多服务端的 OAuth 凭据，一旦令牌存储被攻破，可能暴露对多个服务的访问权限。
+from fastmcp import Client
+from fastmcp.client.auth import OAuth
+from key_value.aio.stores.disk import DiskStore
+from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
+from cryptography.fernet import Fernet
+import os
+
+# 创建加密磁盘存储
+encrypted_storage = FernetEncryptionWrapper(
+    key_value=DiskStore(directory="~/.fastmcp/oauth-tokens"),
+    fernet=Fernet(os.environ["OAUTH_STORAGE_ENCRYPTION_KEY"])
+)
+
+oauth = OAuth(token_storage=encrypted_storage)
+
+async with Client("https://your-server.fastmcp.app/mcp", auth=oauth) as client:
+    await client.ping()
+
+你可以使用 key-value library 中任何兼容 AsyncKeyValue 的后端，包括 Redis、DynamoDB 等。使用 FernetEncryptionWrapper 包装存储即可加密。
+选择存储后端时，请查看 py-key-value 文档，了解所选后端的成熟度和限制。某些后端可能仍处于预览阶段，或存在会影响生产适用性的约束。
+
+CIMD 认证
+版本
+3.0.0
+新增
+Client ID Metadata Documents (CIMD) 提供了 Dynamic Client Registration 的替代方案。客户端无需向每个服务端注册，而是在 HTTPS URL 上托管一个静态 JSON 文档。该 URL 会成为客户端身份，服务端可以通过你的域名所有权验证你是谁。
+from fastmcp import Client
+from fastmcp.client.auth import OAuth
+
+async with Client(
+    "https://mcp-server.example.com/mcp",
+    auth=OAuth(
+        client_metadata_url="https://myapp.example.com/oauth/client.json",
+    ),
+) as client:
+    await client.ping()
+
+关于创建、托管和验证 CIMD 文档的完整说明，请参见 CIMD 认证 页面。
+
+预注册客户端
+版本
+3.0.0
+新增
+有些 OAuth 服务端不支持 Dynamic Client Registration，MCP 规范明确将 DCR 设为可选。如果你的客户端已在服务端预注册（已经拥有 client_id，也可能拥有 client_secret），可以直接提供这些凭据以完全跳过 DCR。
+from fastmcp import Client
+from fastmcp.client.auth import OAuth
+
+async with Client(
+    "https://mcp-server.example.com/mcp",
+    auth=OAuth(
+        client_id="my-registered-client-id",
+        client_secret="my-client-secret",
+    ),
+) as client:
+    await client.ping()
+
+依赖 PKCE 保证安全的公开客户端可以省略 client_secret：
+oauth = OAuth(client_id="my-public-client-id")
+
+使用预注册凭据时，客户端不会尝试 Dynamic Client Registration。如果服务端拒绝这些凭据，错误会立即暴露，而不会回退到 DCR。
+通知
+
+CIMD 认证
+
+x
+

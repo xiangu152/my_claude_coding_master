@@ -1,0 +1,97 @@
+---
+title: "服务端日志"
+source: "https://fastmcp.wiki/zh/clients/logging"
+version: "latest"
+---
+
+# 服务端日志
+
+> 原始文档来源：https://fastmcp.wiki/zh/clients/logging
+
+---
+
+日志处理器
+结构化日志
+默认行为
+操作
+服务端日志
+
+接收并处理来自 MCP 服务端的日志消息。
+
+版本
+2.0.0
+新增
+当你需要捕获或处理服务端发送的日志消息时，请使用此功能。
+MCP 服务端可以向客户端发送日志消息。客户端通过日志处理器回调处理这些消息。
+
+日志处理器
+创建客户端时提供 log_handler 函数：
+import logging
+from fastmcp import Client
+from fastmcp.client.logging import LogMessage
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
+LOGGING_LEVEL_MAP = logging.getLevelNamesMapping()
+
+async def log_handler(message: LogMessage):
+    """将 MCP 服务端日志转发到 Python 的 logging 系统。"""
+    msg = message.data.get('msg')
+    extra = message.data.get('extra')
+
+    level = LOGGING_LEVEL_MAP.get(message.level.upper(), logging.INFO)
+    logger.log(level, msg, extra=extra)
+
+client = Client(
+    "my_mcp_server.py",
+    log_handler=log_handler,
+)
+
+处理器会接收一个 LogMessage 对象：
+LogMessage
+
+level
+Literal["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"]
+日志级别
+
+logger
+str | None
+logger 名称（可能为 None）
+
+data
+dict
+日志载荷，包含 msg 和 extra 键
+
+结构化日志
+message.data 属性是包含日志载荷的字典。它支持带丰富上下文信息的结构化日志记录。
+async def detailed_log_handler(message: LogMessage):
+    msg = message.data.get('msg')
+    extra = message.data.get('extra')
+
+    if message.level == "error":
+        print(f"ERROR: {msg} | Details: {extra}")
+    elif message.level == "warning":
+        print(f"WARNING: {msg} | Details: {extra}")
+    else:
+        print(f"{message.level.upper()}: {msg}")
+
+即使日志通过 FastMCP 代理转发，这种结构也会保留，因此很适合调试多服务端应用。
+
+默认行为
+如果没有提供自定义 log_handler，FastMCP 的默认处理器会按适当严重级别将服务端日志路由到 Python 的 logging 系统。MCP 级别映射如下：notice 会变为 INFO；alert 和 emergency 会变为 CRITICAL。
+client = Client("my_mcp_server.py")
+
+async with client:
+    # 服务端日志会自动按适当严重级别转发
+    await client.call_tool("some_tool")
+
+进度监控
+
+客户端根目录
+
+x
+

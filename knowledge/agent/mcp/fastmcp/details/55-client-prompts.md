@@ -1,0 +1,137 @@
+---
+title: "获取提示词"
+source: "https://fastmcp.wiki/zh/clients/prompts"
+version: "latest"
+---
+
+# 获取提示词
+
+> 原始文档来源：https://fastmcp.wiki/zh/clients/prompts
+
+---
+
+基本用法
+参数序列化
+处理结果
+版本选择
+多服务端客户端
+原始协议访问
+操作
+获取提示词
+
+获取渲染后的消息模板，并自动序列化参数。
+
+版本
+2.0.0
+新增
+当你需要获取服务端定义、用于 LLM 交互的消息模板时，请使用此功能。
+提示词是 MCP 服务端暴露的可复用消息模板。它们可以接受参数，为 LLM 交互生成个性化消息序列。
+
+基本用法
+使用 get_prompt() 请求渲染后的提示词：
+async with client:
+    # 不带参数的简单提示词
+    result = await client.get_prompt("welcome_message")
+    # result -> mcp.types.GetPromptResult
+
+    # 访问生成的消息
+    for message in result.messages:
+        print(f"Role: {message.role}")
+        print(f"Content: {message.content}")
+
+传入参数来自定义提示词：
+async with client:
+    result = await client.get_prompt("user_greeting", {
+        "name": "Alice",
+        "role": "administrator"
+    })
+
+    for message in result.messages:
+        print(f"Generated message: {message.content}")
+
+参数序列化
+版本
+2.9.0
+新增
+FastMCP 会按照 MCP 规范要求，自动将复杂参数序列化为 JSON 字符串。你可以直接传入类型化对象：
+from dataclasses import dataclass
+
+@dataclass
+class UserData:
+    name: str
+    age: int
+
+async with client:
+    result = await client.get_prompt("analyze_user", {
+        "user": UserData(name="Alice", age=30),     # 自动序列化
+        "preferences": {"theme": "dark"},           # 字典会被序列化
+        "scores": [85, 92, 78],                     # 列表会被序列化
+        "simple_name": "Bob"                        # 字符串保持不变
+    })
+
+客户端使用 pydantic_core.to_json() 处理序列化，以获得一致格式。FastMCP 服务端会自动将这些 JSON 字符串反序列化回预期类型。
+
+处理结果
+get_prompt() 方法返回包含消息列表的 GetPromptResult：
+async with client:
+    result = await client.get_prompt("conversation_starter", {"topic": "climate"})
+
+    for i, message in enumerate(result.messages):
+        print(f"Message {i + 1}:")
+        print(f"  Role: {message.role}")
+        print(f"  Content: {message.content.text if hasattr(message.content, 'text') else message.content}")
+
+提示词可以生成不同类型的消息。系统消息用于配置 LLM 行为：
+async with client:
+    result = await client.get_prompt("system_configuration", {
+        "role": "helpful assistant",
+        "expertise": "python programming"
+    })
+
+    # 访问返回的消息
+    message = result.messages[0]
+    print(f"Prompt: {message.content}")
+
+对话模板会生成多轮流程：
+async with client:
+    result = await client.get_prompt("interview_template", {
+        "candidate_name": "Alice",
+        "position": "Senior Developer"
+    })
+
+    # 对话流程中的多条消息
+    for message in result.messages:
+        print(f"{message.role}: {message.content}")
+
+版本选择
+版本
+3.0.0
+新增
+当服务端暴露同一提示词的多个版本时，可以请求特定版本：
+async with client:
+    # 获取最高版本（默认）
+    result = await client.get_prompt("summarize", {"text": "..."})
+
+    # 获取特定版本
+    result_v1 = await client.get_prompt("summarize", {"text": "..."}, version="1.0")
+
+如何发现可用版本，请参见元数据。
+
+多服务端客户端
+使用多服务端客户端时，可以直接访问提示词，无需添加前缀：
+async with client:  # Multi-server client
+    result1 = await client.get_prompt("weather_prompt", {"city": "London"})
+    result2 = await client.get_prompt("assistant_prompt", {"query": "help"})
+
+原始协议访问
+如需完全控制，请使用 get_prompt_mcp()，它会返回完整的 MCP 协议对象：
+async with client:
+    result = await client.get_prompt_mcp("example_prompt", {"arg": "value"})
+    # result -> mcp.types.GetPromptResult
+
+读取资源
+
+LLM 采样
+
+x
+

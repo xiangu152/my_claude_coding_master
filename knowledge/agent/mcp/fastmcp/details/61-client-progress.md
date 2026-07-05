@@ -1,0 +1,75 @@
+---
+title: "进度监控"
+source: "https://fastmcp.wiki/zh/clients/progress"
+version: "latest"
+---
+
+# 进度监控
+
+> 原始文档来源：https://fastmcp.wiki/zh/clients/progress
+
+---
+
+进度处理器
+按调用指定处理器
+操作
+进度监控
+
+处理长时间运行的服务端操作发出的进度通知。
+
+版本
+2.3.5
+新增
+当你需要跟踪长时间运行操作的进度时，请使用此功能。
+MCP 服务端可以在操作期间报告进度。客户端通过进度处理器接收这些更新。
+
+进度处理器
+创建客户端时设置处理器：
+from fastmcp import Client
+
+async def progress_handler(
+    progress: float,
+    total: float | None,
+    message: str | None
+) -> None:
+    if total is not None:
+        percentage = (progress / total) * 100
+        print(f"Progress: {percentage:.1f}% - {message or ''}")
+    else:
+        print(f"Progress: {progress} - {message or ''}")
+
+client = Client(
+    "my_mcp_server.py",
+    progress_handler=progress_handler
+)
+
+处理器接收三个参数：
+处理器参数
+
+progress
+float
+当前进度值
+
+total
+float | None
+预期总值（未知时可能为 None）
+
+message
+str | None
+可选状态消息
+
+按调用指定处理器
+为特定工具调用覆盖客户端级处理器：
+async with client:
+    result = await client.call_tool(
+        "long_running_task",
+        {"param": "value"},
+        progress_handler=my_progress_handler
+    )
+
+后台任务
+
+服务端日志
+
+x
+

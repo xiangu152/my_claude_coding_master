@@ -1,0 +1,131 @@
+---
+title: "快速开始"
+source: "https://fastmcp.wiki/zh/getting-started/quickstart"
+version: "latest"
+---
+
+# 快速开始
+
+> 原始文档来源：https://fastmcp.wiki/zh/getting-started/quickstart
+
+---
+
+创建 FastMCP 服务端
+添加工具
+运行服务端
+使用 FastMCP CLI
+调用服务端
+为工具添加 UI
+部署到 Prefect Horizon
+开始
+快速开始
+
+欢迎！本指南将帮助你快速设置 FastMCP，运行第一个 MCP 服务端，为它添加可视化 UI，并部署到 Prefect Horizon。
+如果你还没有安装 FastMCP，请先按照安装说明操作。
+
+创建 FastMCP 服务端
+FastMCP 服务端是一组工具、资源和其他 MCP 组件。要创建服务端，先实例化 FastMCP 类。
+新建一个名为 my_server.py 的文件，并添加以下代码：
+my_server.py
+from fastmcp import FastMCP
+
+mcp = FastMCP("My MCP Server")
+
+就这样！你已经创建了一个 FastMCP 服务端，虽然它现在还很普通。接下来添加一个工具，让它更有用。
+
+添加工具
+要添加一个返回简单问候语的工具，编写一个函数并用 @mcp.tool 装饰它，将它注册到服务端：
+my_server.py
+from fastmcp import FastMCP
+
+mcp = FastMCP("My MCP Server")
+
+@mcp.tool
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
+
+运行服务端
+运行 FastMCP 服务端最简单的方式是调用它的 run() 方法。你可以选择不同的传输方式，例如本地服务端使用 stdio，远程访问使用 http：
+my_server.py (stdio)
+my_server.py (HTTP)
+from fastmcp import FastMCP
+
+mcp = FastMCP("My MCP Server")
+
+@mcp.tool
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
+
+if __name__ == "__main__":
+    mcp.run()
+
+这样就可以用 python my_server.py 运行服务端。stdio 传输是将 MCP 服务端连接到客户端的传统方式，而 HTTP 传输支持远程连接。
+为什么需要 if __name__ == "__main__": 代码块？
+建议保留 __main__ 代码块，以获得一致性和兼容性，确保那些把服务端文件当作脚本执行的 MCP 客户端也能正常工作。如果你只会通过 FastMCP CLI 运行服务端，可以省略它，因为 CLI 会直接导入服务端对象。
+
+使用 FastMCP CLI
+你也可以使用 fastmcp run 命令启动服务端。请注意，FastMCP CLI 不会执行服务端文件中的 __main__ 代码块。它会导入服务端对象，并使用你提供的传输方式和选项运行它。
+例如，要使用默认的 stdio 传输运行此服务端（无论你如何调用 mcp.run()），可以使用以下命令：
+fastmcp run my_server.py:mcp
+
+要使用 HTTP 传输运行此服务端，可以使用以下命令：
+fastmcp run my_server.py:mcp --transport http --port 8000
+
+调用服务端
+当服务端通过 HTTP 传输运行后，你可以使用 FastMCP 客户端或任何支持 MCP 协议的 LLM 客户端连接它：
+my_client.py
+import asyncio
+from fastmcp import Client
+
+client = Client("http://localhost:8000/mcp")
+
+async def call_tool(name: str):
+    async with client:
+        result = await client.call_tool("greet", {"name": name})
+        print(result)
+
+asyncio.run(call_tool("Ford"))
+
+注意：
+FastMCP 客户端是异步的，因此需要使用 asyncio.run 运行客户端
+使用客户端前，必须进入客户端上下文（async with client:）
+你可以在同一个上下文中发起多次客户端调用
+
+为工具添加 UI
+工具通常返回文本，但任何工具也可以返回交互式 UI。给工具装饰器添加 app=True，并返回一个 Prefab 组件，宿主就会在对话中将它渲染为图表、表格、表单或其他可视元素。这需要安装 apps extra（pip install "fastmcp[apps]"）。
+app=True 标志会告诉 FastMCP 自动连接渲染器和协议元数据。这个工具仍然像其他 MCP 工具一样工作：接收参数并返回结果；只是结果变成了组件树，由宿主以可视化方式展示，而不是纯文本。
+my_server.py
+from prefab_ui.app import PrefabApp
+from prefab_ui.components import Column, Heading, Text, Badge, Row
+from fastmcp import FastMCP
+
+mcp = FastMCP("My MCP Server")
+
+@mcp.tool(app=True)
+def greet(name: str) -> PrefabApp:
+    """用可视化卡片问候某人。"""
+    with Column(gap=4, css_class="p-6") as view:
+        Heading(f"Hello, {name}!")
+        with Row(gap=2, align="center"):
+            Text("Status")
+            Badge("Greeted", variant="success")
+
+    return PrefabApp(view=view)
+
+你可以使用 fastmcp dev apps my_server.py 在本地预览 app 工具，无需 MCP 宿主。完整指南请参阅 Apps 概览，其中包括状态管理、表单、图表，以及与服务端连接的交互能力。
+
+部署到 Prefect Horizon
+Prefect Horizon 是 Prefect 的 FastMCP 团队构建的企业级 MCP 平台。它为 MCP 服务端提供托管、身份认证、访问控制和可观测性。
+Horizon 对个人项目免费，并为团队提供企业级治理能力。
+要部署服务端，你需要一个 GitHub account。准备好后，可以通过三步完成部署：
+将 my_server.py 文件推送到 GitHub 仓库
+使用 GitHub 账号登录 Prefect Horizon
+从你的仓库创建新项目，并输入 my_server.py:mcp 作为服务端入口点
+完成！Horizon 会构建并部署你的服务端，使它可以通过类似 https://your-project.fastmcp.app/mcp 的 URL 访问。你可以通过对话测试它的功能，也可以从任何支持 MCP 协议的 LLM 客户端连接它。
+更多细节请参阅 Prefect Horizon 指南。
+安装
+
+FastMCP 服务端
+
+x
+

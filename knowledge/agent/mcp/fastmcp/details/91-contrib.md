@@ -1,0 +1,54 @@
+---
+title: "Contrib 模块"
+source: "https://fastmcp.wiki/zh/patterns/contrib"
+version: "latest"
+---
+
+# Contrib 模块
+
+> 原始文档来源：https://fastmcp.wiki/zh/patterns/contrib
+
+---
+
+用法
+重要注意事项
+贡献
+开发
+Contrib 模块
+
+扩展 FastMCP 的社区贡献模块
+
+版本
+2.2.1
+新增
+FastMCP 包含一个 contrib 包，用于存放社区贡献的模块。这些模块扩展了 FastMCP 的功能，但不由核心团队正式维护。
+Contrib 模块提供额外功能、集成或模式，用来补充 FastMCP 核心库。它们让社区能够共享有用扩展，同时让核心库保持聚焦且易于维护。
+可用模块可以在 contrib 目录中查看。
+
+用法
+要使用 contrib 模块，请从 fastmcp.contrib 包导入：
+from fastmcp.contrib import my_module
+
+重要注意事项
+稳定性：与核心库相比，contrib 中的模块可能有不同的测试要求或稳定性保证。
+兼容性：FastMCP 核心的变更可能会破坏 contrib 中的模块，而且主 changelog 中不一定会明确警告。
+依赖项：Contrib 模块可能有核心库不需要的额外依赖。这些依赖通常会记录在模块 README 或独立的 requirements 文件中。
+
+贡献
+我们欢迎你为 contrib 包做贡献！如果你有一个能以有用方式扩展 FastMCP 的模块，可以考虑贡献出来：
+在 fastmcp_slim/fastmcp/contrib/ 中为你的模块创建新目录
+在 tests/contrib/ 中为你的模块添加适当测试
+在 README.md 文件中包含完整文档，包括用法和示例，以及任何额外依赖或安装说明
+提交 pull request
+理想的 contrib 模块应当：
+解决特定用例或集成需求
+遵循 FastMCP 编码标准
+包含完整文档和示例
+具备全面测试
+明确说明任何额外依赖
+发布
+
+FastMCP 更新时间线
+
+x
+

@@ -1,0 +1,58 @@
+# Runtime/session data
+*.jsonl
+*.lock
+*.log
+*.json
+!settings.json
+!settings.local.json
+
+# Session-specific
+sessions/
+tasks/
+plans/
+debug/
+shell-snapshots/
+file-history/
+jobs/
+downloads/
+cache/
+backups/
+output/
+transcripts/
+teams/
+dispatcher/
+hud/
+ide/
+statsig/
+todos/
+telemetry/
+workspace/
+daemon/
+knowledge_bases/
+projects/*/memory/
+
+# Backups
+CLAUDE.md.backup.*
+
+# OMC state
+.omc/
+.omc-*.json
+.omc-*.json.bak
+.session-stats.json
+.last-cleanup
+.last-update-result.json
+.task-manifest.json
+stats-cache.json
+history.jsonl
+
+# Plugins (managed separately)
+plugins/
+
+# Rules (user-specific)
+rules/
+
+# Keep
+!CLAUDE.md
+!knowledge/
+!skills/
+!projects/-Users-xiangu/memory/

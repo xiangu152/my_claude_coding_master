@@ -1,0 +1,109 @@
+---
+title: "安装"
+source: "https://fastmcp.wiki/zh/getting-started/installation"
+version: "latest"
+---
+
+# 安装
+
+> 原始文档来源：https://fastmcp.wiki/zh/getting-started/installation
+
+---
+
+安装 FastMCP
+可选依赖
+验证安装
+依赖许可证
+升级
+从 FastMCP 2.0 升级
+从 MCP SDK 升级
+从 FastMCP 1.0 升级
+从底层 Server API 升级
+故障排除
+pip 升级后 import fastmcp 失败
+版本策略
+参与 FastMCP 贡献
+开始
+安装
+
+安装 FastMCP 并验证你的环境
+
+安装 FastMCP
+我们推荐使用 uv 安装和管理 FastMCP。
+pip install fastmcp
+
+或者使用 uv：
+uv add fastmcp
+
+可选依赖
+FastMCP 为特定功能提供可选 extras。例如，要安装后台任务 extra：
+pip install "fastmcp[tasks]"
+
+有关任务系统的详细信息，请参阅后台任务。
+
+验证安装
+要验证 FastMCP 是否已正确安装，可以运行以下命令：
+fastmcp version
+
+你应该会看到类似下面的输出：
+$ fastmcp version
+
+FastMCP version:                           3.0.0
+MCP version:                               1.25.0
+Python version:                            3.12.2
+Platform:            macOS-15.3.1-arm64-arm-64bit
+FastMCP root path:            ~/Developer/fastmcp
+
+依赖许可证
+FastMCP 的 CLI 功能依赖 Cyclopts。Cyclopts v4 将 docutils 作为传递依赖，而 docutils 的许可证较复杂，可能会触发某些组织的合规审查。
+如果这对你有影响，可以安装 Cyclopts v5 alpha，它移除了这个依赖：
+pip install "cyclopts>=5.0.0a1"
+
+或者等待稳定版 v5 发布。详情请参阅这个 issue。
+
+升级
+
+从 FastMCP 2.0 升级
+有关破坏性变更和迁移步骤的完整列表，请参阅升级指南。
+
+从 MCP SDK 升级
+
+从 FastMCP 1.0 升级
+如果你通过 mcp 包使用 FastMCP 1.0（也就是以 from mcp.server.fastmcp import FastMCP 的方式导入 FastMCP），升级会很直接；对大多数服务端来说，只需要改一行导入。详情请参阅完整升级指南。
+
+从底层 Server API 升级
+如果你直接基于 mcp 包的 Server 类构建服务端，使用 list_tools()/call_tool() 处理器并手写 JSON Schema，请参阅迁移指南获取完整演练。
+
+故障排除
+
+pip 升级后 import fastmcp 失败
+这只影响一个特定场景：使用 pip 从 FastMCP 3.2 或更早版本升级到 FastMCP 3.3 或更高版本。全新安装和 uv 升级不受影响；如果你没有做过这种升级，可以跳过本节。
+如果升级后立刻出现 import fastmcp 抛出 ModuleNotFoundError，或 from fastmcp import FastMCP 抛出 ImportError，说明你的安装处于“半移除”状态。请一步重新安装：
+pip install --force-reinstall fastmcp
+
+如果仍未解决，请移除两个 distribution，然后从干净状态重新安装：
+pip uninstall -y fastmcp fastmcp-slim
+pip install fastmcp
+
+FastMCP 3.3 将可导入代码从 fastmcp distribution 移到了 fastmcp-slim。在单条 pip 升级命令中，pip 可能先安装新文件，然后在卸载旧的 fastmcp distribution 时又删除这些文件，因为旧包的文件清单仍然记录了这些路径。uv 会先卸载再安装，因此不受影响。
+
+版本策略
+FastMCP 遵循语义化版本，并针对快速演进的 MCP 生态做了务实调整。为了跟上 MCP Protocol 的变化，必要时破坏性变更可能出现在 minor 版本中（例如从 2.3.x 到 2.4.0）。
+在生产环境中，请始终固定到精确版本：
+fastmcp==3.0.0  # 推荐
+fastmcp>=3.0.0  # 不推荐 - 可能安装包含破坏性变更的版本
+
+有关公共 API、弃用实践和破坏性变更原则的详细信息，请参阅完整的版本与发布策略。
+
+参与 FastMCP 贡献
+想为 FastMCP 做贡献？请参阅贡献指南，了解以下内容：
+设置开发环境
+运行测试和 pre-commit hooks
+提交 issues 和 pull requests
+代码规范和评审流程
+欢迎使用 FastMCP
+
+快速开始
+
+x
+

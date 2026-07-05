@@ -1,0 +1,146 @@
+---
+title: "图标"
+source: "https://fastmcp.wiki/zh/servers/icons"
+version: "latest"
+---
+
+# 图标
+
+> 原始文档来源：https://fastmcp.wiki/zh/servers/icons
+
+---
+
+图标格式
+服务端图标
+组件图标
+工具图标
+资源图标
+资源模板图标
+提示词图标
+使用 Data URI
+从文件生成 Data URI
+交互
+图标
+
+为服务端、工具、资源和提示词添加可视化图标
+
+版本
+2.13.0
+新增
+图标为 MCP 服务端和组件提供可视化表示，帮助客户端应用呈现更好的用户界面。在 MCP 客户端中显示时，图标可以帮助用户快速识别并浏览服务端能力。
+
+图标格式
+图标使用 MCP 协议规范中的标准 MCP Icon 类型。每个图标都会指定源 URL 或 data URI，并可选包含 MIME 类型和尺寸信息。
+from mcp.types import Icon
+
+icon = Icon(
+    src="https://example.com/icon.png",
+    mimeType="image/png",
+    sizes=["48x48"]
+)
+
+这些字段有不同用途：
+src：指向图标图片的 URL 或 data URI
+mimeType（可选）：图片的 MIME 类型（例如 “image/png”、“image/svg+xml”）
+sizes（可选）：尺寸描述符数组（例如 [“48x48”]、[“any”]）
+
+服务端图标
+为服务端添加图标和网站 URL，以便在客户端应用中显示。多个不同尺寸的图标可以帮助客户端为其显示上下文选择最佳分辨率。
+from fastmcp import FastMCP
+from mcp.types import Icon
+
+mcp = FastMCP(
+    name="WeatherService",
+    website_url="https://weather.example.com",
+    icons=[
+        Icon(
+            src="https://weather.example.com/icon-48.png",
+            mimeType="image/png",
+            sizes=["48x48"]
+        ),
+        Icon(
+            src="https://weather.example.com/icon-96.png",
+            mimeType="image/png",
+            sizes=["96x96"]
+        ),
+    ]
+)
+
+服务端图标会出现在 MCP 客户端界面中，帮助用户在已安装的多个服务端中识别你的服务端。
+
+组件图标
+可以向单个工具、资源、资源模板和提示词添加图标。这有助于用户从视觉上区分不同组件类型和用途。
+
+工具图标
+from mcp.types import Icon
+
+@mcp.tool(
+    icons=[Icon(src="https://example.com/calculator-icon.png")]
+)
+def calculate_sum(a: int, b: int) -> int:
+    """将两个数字相加。"""
+    return a + b
+
+资源图标
+@mcp.resource(
+    "config://settings",
+    icons=[Icon(src="https://example.com/config-icon.png")]
+)
+def get_settings() -> dict:
+    """检索应用设置。"""
+    return {"theme": "dark", "language": "en"}
+
+资源模板图标
+@mcp.resource(
+    "user://{user_id}/profile",
+    icons=[Icon(src="https://example.com/user-icon.png")]
+)
+def get_user_profile(user_id: str) -> dict:
+    """获取用户资料。"""
+    return {"id": user_id, "name": f"User {user_id}"}
+
+提示词图标
+@mcp.prompt(
+    icons=[Icon(src="https://example.com/prompt-icon.png")]
+)
+def analyze_code(code: str):
+    """创建用于代码分析的提示词。"""
+    return f"Please analyze this code:\n\n{code}"
+
+使用 Data URI
+对于小图标，或希望直接嵌入图标而不依赖外部资源时，请使用 data URI。这种方式无需托管，并确保图标始终可用。
+from mcp.types import Icon
+from fastmcp.utilities.types import Image
+
+# 作为 data URI 的 SVG 图标
+svg_icon = Icon(
+    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6Ii8+PC9zdmc+",
+    mimeType="image/svg+xml"
+)
+
+@mcp.tool(icons=[svg_icon])
+def my_tool() -> str:
+    """带嵌入式 SVG 图标的工具。"""
+    return "result"
+
+从文件生成 Data URI
+FastMCP 提供 Image 工具类，用于将本地图片文件转换为 data URI。
+from mcp.types import Icon
+from fastmcp.utilities.types import Image
+
+# 从本地图片文件生成 data URI
+img = Image(path="./assets/brand/favicon.png")
+icon = Icon(src=img.to_data_uri())
+
+@mcp.tool(icons=[icon])
+def file_icon_tool() -> str:
+    """带有从本地文件生成的图标的工具。"""
+    return "result"
+
+当你有本地图片资源，并希望将其直接嵌入服务端定义时，这种方式很有用。
+分页
+
+MCP 中间件
+
+x
+
