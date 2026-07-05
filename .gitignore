@@ -60,3 +60,7 @@ rules/
 # daily-agent-learn skill data
 !skills/daily-agent-learn/repos.json
 !skills/daily-agent-learn/summary_index.md
+
+# daily-arxiv-paper skill data
+!skills/daily-arxiv-paper/papers.json
+!skills/daily-arxiv-paper/summary_index.md
