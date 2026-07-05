@@ -56,3 +56,7 @@ rules/
 !knowledge/
 !skills/
 !projects/-Users-xiangu/memory/
+
+# daily-agent-learn skill data
+!skills/daily-agent-learn/repos.json
+!skills/daily-agent-learn/summary_index.md

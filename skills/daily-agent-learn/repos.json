@@ -1,0 +1,28 @@
+{
+  "repos": [
+    {
+      "owner": "mem0ai",
+      "repo": "mem0",
+      "url": "https://github.com/mem0ai/mem0",
+      "stars": 60096,
+      "topic": "Agent Memory",
+      "learned_at": "2025-07-05",
+      "path": "repo/mem0ai-mem0",
+      "studied": false,
+      "has_agents_md": true,
+      "has_learning_md": true
+    },
+    {
+      "owner": "letta-ai",
+      "repo": "letta",
+      "url": "https://github.com/letta-ai/letta",
+      "stars": 23650,
+      "topic": "Agent Memory",
+      "learned_at": "2025-07-05",
+      "path": "repo/letta-ai-letta",
+      "studied": false,
+      "has_agents_md": true,
+      "has_learning_md": true
+    }
+  ]
+}
